@@ -1,50 +1,24 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Path, Circle } from 'react-native-svg';
+import { Text, View } from 'react-native';
 import { colors } from '../theme';
 
-// Icon only (the ring + play button, no background tile)
-export function LogoMark({ size = 64 }: { size?: number }) {
+// Text wordmark: CINE (white) + HUB (red).
+export function Logo({ size = 28 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="96 96 320 320">
-      <Defs>
-        <LinearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#FFD84A" />
-          <Stop offset="1" stopColor="#FF9A1F" />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d="M358 142 A138 138 0 1 0 358 370"
-        fill="none"
-        stroke="url(#amber)"
-        strokeWidth={34}
-        strokeLinecap="round"
-      />
-      <Path
-        d="M228 192 L228 320 Q228 336 242 328 L338 264 Q350 256 338 248 L242 184 Q228 176 228 192 Z"
-        fill="url(#amber)"
-      />
-      <Circle cx={398} cy={256} r={17} fill="url(#amber)" />
-    </Svg>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Text style={{ color: colors.text, fontSize: size, fontWeight: '900', letterSpacing: size * 0.04 }}>CINE</Text>
+      <View style={{ backgroundColor: colors.accent, borderRadius: size * 0.16, paddingHorizontal: size * 0.2, marginLeft: size * 0.12 }}>
+        <Text style={{ color: colors.onAccent, fontSize: size, fontWeight: '900', letterSpacing: size * 0.04 }}>HUB</Text>
+      </View>
+    </View>
   );
 }
 
-// Icon + "CineHub" wordmark
-export function Logo({ size = 44 }: { size?: number }) {
+// Small square mark (for avatars / headers where the full wordmark does not fit).
+export function LogoMark({ size = 32 }: { size?: number }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <LogoMark size={size} />
-      <Text
-        style={{
-          marginLeft: 8,
-          fontSize: size * 0.7,
-          fontWeight: '800',
-          letterSpacing: -1,
-          color: colors.text,
-        }}
-      >
-        Cine<Text style={{ color: colors.amberSolid }}>Hub</Text>
-      </Text>
+    <View style={{ width: size, height: size, borderRadius: size * 0.26, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.onAccent, fontSize: size * 0.6, fontWeight: '900' }}>C</Text>
     </View>
   );
 }

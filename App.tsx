@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
@@ -14,21 +14,31 @@ import Details from './src/screens/Details';
 import Player from './src/screens/Player';
 import ListScreen from './src/screens/ListScreen';
 import AdminPlugins from './src/screens/admin/Plugins';
+import { startPluginSync } from './src/plugins/loader';
 
 const Stack = createNativeStackNavigator();
 
 const navTheme = {
   ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: colors.bg },
+  dark: true,
+  colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.bg, text: colors.text, border: colors.border, primary: colors.accent },
 };
 
 function Root() {
   const { session, ready } = useAuth();
 
+  // While someone is logged in, plugins are re-checked when the app opens and every 45 seconds,
+  // so a plugin the admin installs goes live on every phone without reinstalling the app.
+  const loggedIn = !!session;
+  useEffect(() => {
+    if (!loggedIn) return;
+    return startPluginSync();
+  }, [loggedIn]);
+
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.amberSolid} />
+        <ActivityIndicator color={colors.text} />
       </View>
     );
   }
@@ -36,10 +46,10 @@ function Root() {
   return (
     <NavigationContainer theme={navTheme}>
       {session ? (
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Screen name="Main" component={Main} />
           <Stack.Screen name="Details" component={Details} />
-          <Stack.Screen name="Player" component={Player} />
+          <Stack.Screen name="Player" component={Player} options={{ animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="List" component={ListScreen} />
           <Stack.Screen name="AdminPlugins" component={AdminPlugins} />
         </Stack.Navigator>

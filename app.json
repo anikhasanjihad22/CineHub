@@ -2,16 +2,16 @@
   "expo": {
     "name": "CineHub",
     "slug": "cinehub",
-    "version": "1.0.0",
-    "orientation": "default",
+    "version": "2.0.0",
+    "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0E0B10",
+    "backgroundColor": "#0A0A0C",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.cinehub.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#14101A"
+        "backgroundColor": "#0A0A0C"
       }
     },
     "plugins": [

@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '../components/Screen';
 import { Button } from '../components/Button';
+import { Field } from '../components/Field';
+import { Icon } from '../components/Icon';
 import { Logo } from '../components/Logo';
 import { supabase } from '../lib/supabase';
+import { openSupport } from '../lib/support';
 import { colors, radius } from '../theme';
 
 export default function Login({ route, navigation }: any) {
@@ -45,72 +48,72 @@ export default function Login({ route, navigation }: any) {
   return (
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+        <View style={styles.top}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.back} hitSlop={8}><Icon name="back" size={22} /></Pressable>
+          <Logo size={22} />
+          <View style={{ width: 40 }} />
+        </View>
 
-        <View style={styles.center}>
-          <Logo size={46} />
-          <Text style={styles.heading}>{isSignup ? 'Create your account' : 'Welcome back'}</Text>
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Text style={styles.heading}>{isSignup ? 'Create account' : 'Welcome back'}</Text>
           <Text style={styles.sub}>
-            {isSignup ? 'Sign up with your email. It is free.' : 'Sign in to keep watching.'}
+            {isSignup ? 'Sign up with your email to start watching.' : 'Sign in to continue watching.'}
           </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
+          <Field
+            label="Email" icon="mail" placeholder="you@example.com" autoCapitalize="none" autoCorrect={false}
+            keyboardType="email-address" value={email} onChangeText={setEmail}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={colors.muted}
-            secureTextEntry
-            autoCapitalize="none"
-            value={password}
-            onChangeText={setPassword}
+          <Field
+            label="Password" icon="lock" placeholder="At least 6 characters" secure autoCapitalize="none"
+            value={password} onChangeText={setPassword} onSubmitEditing={submit}
           />
 
-          {!!error && <Text style={styles.error}>{error}</Text>}
-          {!!info && <Text style={styles.info}>{info}</Text>}
+          {!!error && (
+            <View style={[styles.banner, styles.bannerErr]}>
+              <Icon name="info" size={18} color={colors.danger} />
+              <Text style={[styles.bannerText, { color: colors.danger }]}>{error}</Text>
+            </View>
+          )}
+          {!!info && (
+            <View style={[styles.banner, styles.bannerOk]}>
+              <Icon name="check" size={18} color={colors.success} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>{info}</Text>
+            </View>
+          )}
 
-          <View style={{ height: 8 }} />
+          <View style={{ height: 10 }} />
           <Button label={isSignup ? 'Create account' : 'Sign in'} onPress={submit} loading={loading} />
 
-          <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(''); setInfo(''); }}>
+          <Pressable onPress={() => { setMode(isSignup ? 'signin' : 'signup'); setError(''); setInfo(''); }} style={{ marginTop: 22 }}>
             <Text style={styles.switch}>
-              {isSignup ? 'Already have an account? Sign in' : 'New here? Create an account'}
+              {isSignup ? 'Already have an account? ' : 'New to CineHub? '}
+              <Text style={styles.switchStrong}>{isSignup ? 'Sign in' : 'Create an account'}</Text>
             </Text>
           </Pressable>
-        </View>
+
+          <Pressable onPress={openSupport} style={styles.help} hitSlop={8}>
+            <Icon name="send" size={15} color={colors.muted} />
+            <Text style={styles.helpText}>Need help? Contact support</Text>
+          </Pressable>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { padding: 18 },
-  backText: { color: colors.muted, fontSize: 15 },
-  center: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 60 },
-  heading: { color: colors.text, fontSize: 26, fontWeight: '700', marginTop: 28 },
-  sub: { color: colors.muted, fontSize: 14, marginTop: 6, marginBottom: 22 },
-  input: {
-    height: 54,
-    borderRadius: radius.md,
-    paddingHorizontal: 18,
-    marginBottom: 12,
-    color: colors.text,
-    fontSize: 16,
-    backgroundColor: colors.glass,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  error: { color: colors.danger, fontSize: 13, marginTop: 2 },
-  info: { color: colors.amberSolid, fontSize: 13, marginTop: 2 },
-  switch: { color: colors.muted, textAlign: 'center', marginTop: 18, fontSize: 14 },
+  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
+  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  body: { paddingHorizontal: 24, paddingTop: 30, paddingBottom: 30 },
+  heading: { color: colors.text, fontSize: 32, fontWeight: '900', letterSpacing: -0.7 },
+  sub: { color: colors.muted, fontSize: 15, marginTop: 8, marginBottom: 28, lineHeight: 22 },
+  banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: radius.sm, marginTop: 2 },
+  bannerErr: { backgroundColor: 'rgba(255,90,95,0.12)' },
+  bannerOk: { backgroundColor: 'rgba(61,220,132,0.12)' },
+  bannerText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  switch: { color: colors.muted, textAlign: 'center', fontSize: 14 },
+  switchStrong: { color: colors.text, fontWeight: '800' },
+  help: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 34 },
+  helpText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
 });

@@ -27,7 +27,7 @@ jobs:
         run: npm install
 
       - name: Install Expo-matched packages
-        run: npx expo install expo-status-bar expo-linear-gradient expo-video expo-build-properties react-native-svg react-native-screens react-native-safe-area-context @react-native-async-storage/async-storage
+        run: npx expo install expo-status-bar expo-linear-gradient expo-video expo-screen-orientation expo-build-properties react-native-svg react-native-screens react-native-safe-area-context @react-native-async-storage/async-storage
 
       - name: Align versions with the Expo SDK
         run: npx expo install --fix

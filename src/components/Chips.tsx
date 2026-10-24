@@ -1,8 +1,8 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius } from '../theme';
 
+// Horizontal filter pills (Home categories, seasons).
 export function Chips({ items, value, onChange, padded = true }: {
   items: { key: string; label: string }[]; value: string; onChange: (k: string) => void; padded?: boolean;
 }) {
@@ -10,21 +10,13 @@ export function Chips({ items, value, onChange, padded = true }: {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: padded ? 20 : 0, gap: 10 }}
+      contentContainerStyle={{ paddingHorizontal: padded ? 20 : 0, gap: 8 }}
     >
       {items.map((it) => {
         const active = it.key === value;
         return (
-          <Pressable key={it.key} onPress={() => onChange(it.key)}>
-            {active ? (
-              <LinearGradient colors={colors.amber} style={styles.chip}>
-                <Text style={[styles.text, { color: colors.onAmber, fontWeight: '700' }]}>{it.label}</Text>
-              </LinearGradient>
-            ) : (
-              <Pressable style={[styles.chip, styles.idle]} pointerEvents="none">
-                <Text style={styles.text}>{it.label}</Text>
-              </Pressable>
-            )}
+          <Pressable key={it.key} onPress={() => onChange(it.key)} style={[styles.chip, active && styles.active]}>
+            <Text style={[styles.text, active && styles.activeText]}>{it.label}</Text>
           </Pressable>
         );
       })}
@@ -33,7 +25,11 @@ export function Chips({ items, value, onChange, padded = true }: {
 }
 
 const styles = StyleSheet.create({
-  chip: { height: 40, paddingHorizontal: 18, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  idle: { backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.border },
-  text: { color: colors.text, fontSize: 14 },
+  chip: {
+    height: 36, paddingHorizontal: 16, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+  },
+  active: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
+  text: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
+  activeText: { color: '#000000', fontWeight: '700' },
 });

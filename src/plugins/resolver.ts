@@ -1,5 +1,5 @@
 import { getPlugins } from './loader';
-import { runStreams } from './sandbox';
+import { capabilities, runStreams } from './sandbox';
 import type { Stream } from './types';
 
 export type StreamCtx = {
@@ -12,22 +12,29 @@ export type StreamCtx = {
   episode?: number;
 };
 
-// Asks every matching stream plugin at the same time, merges the answers,
-// removes repeated links and names them Server 1, Server 2, ...
-// If one plugin finds nothing, the others still answer.
-export async function resolveStreams(ctx: StreamCtx): Promise<Stream[]> {
+// Asks every matching plugin at the same time. Each answer is added the moment it arrives
+// (onUpdate), so the video can start from the first working server while slower ones keep searching.
+// Repeated links are removed and the servers are named Server 1, Server 2, ...
+export async function resolveStreams(ctx: StreamCtx, onUpdate?: (list: Stream[]) => void): Promise<Stream[]> {
   const cat = ctx.type === 'movie' ? 'movies' : 'tv';
-  const plugins = (await getPlugins()).filter((p) => p.kind === 'stream' && p.categories.includes(cat));
-  const results = await Promise.all(plugins.map((p) => runStreams(p, ctx).catch(() => [] as Stream[])));
+  const plugins = (await getPlugins()).filter(
+    (p) => (!p.categories?.length || p.categories.includes(cat)) && capabilities(p).stream,
+  );
+  const clean: StreamCtx = ctx.type === 'movie' ? { ...ctx, season: undefined, episode: undefined } : ctx;
 
   const seen = new Set<string>();
   const out: Stream[] = [];
-  for (const list of results) {
+  const add = (list: Stream[], name: string) => {
+    let added = false;
     for (const s of list) {
       if (seen.has(s.url)) continue;
       seen.add(s.url);
-      out.push(s);
+      out.push({ ...s, label: `${name}${s.quality ? ` (${s.quality})` : ''}` });
+      added = true;
     }
-  }
-  return out.map((s, i) => ({ ...s, label: `Server ${i + 1}` }));
+    if (added) onUpdate?.(out.slice());
+  };
+
+  await Promise.all(plugins.map((p) => runStreams(p, clean).then((l) => add(l, p.name)).catch(() => {})));
+  return out.slice();
 }

@@ -1,91 +1,82 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../components/Screen';
 import { Button } from '../components/Button';
 import { Logo } from '../components/Logo';
+import { Icon } from '../components/Icon';
 import { colors, radius } from '../theme';
-
-// Placeholder poster tiles. Real TMDB posters replace these in the Home step.
-const TILES: [string, string][] = [
-  ['#5B2A86', '#1B1035'], ['#C0392B', '#2A0F12'], ['#1E6F5C', '#0B1F1A'],
-  ['#B8860B', '#2A1F05'], ['#2C5AA0', '#0C1A33'], ['#8E3B6B', '#2A0F20'],
-  ['#3D7A3D', '#0F230F'], ['#A0522D', '#2A140A'], ['#4B5FBF', '#12163A'],
-];
+import { hasKey, img, trending } from '../lib/tmdb';
+import { openSupport } from '../lib/support';
 
 export default function Welcome({ navigation }: any) {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [posters, setPosters] = useState<string[]>([]);
+
+  // A wall of trending posters behind the buttons. If TMDB is not reachable the screen is simply plain.
+  useEffect(() => {
+    if (!hasKey()) return;
+    Promise.all([trending('movie'), trending('tv')])
+      .then(([a, b]) => {
+        const all = [...a, ...b].map((t) => img(t.poster, 'w342')).filter(Boolean) as string[];
+        setPosters(all.slice(0, 12));
+      })
+      .catch(() => {});
+  }, []);
+
+  const gap = 10;
+  const colW = Math.floor((width - gap * 4) / 3);
+  const colH = Math.round(colW * 1.5);
+  const cols = [0, 1, 2].map((c) => posters.filter((_, i) => i % 3 === c));
+
   return (
-    <Screen>
-      <View style={styles.collage}>
-        {TILES.map((t, i) => (
-          <LinearGradient key={i} colors={t} style={styles.tile} />
-        ))}
+    <Screen edges={[]}>
+      <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
+        <View style={{ flexDirection: 'row', gap, paddingHorizontal: gap, marginTop: -colH * 0.25 }}>
+          {cols.map((list, c) => (
+            <View key={c} style={{ gap, marginTop: c === 1 ? colH * 0.45 : 0 }}>
+              {list.map((u, i) => (
+                <Image key={i} source={{ uri: u }} style={{ width: colW, height: colH, borderRadius: radius.sm }} />
+              ))}
+            </View>
+          ))}
+        </View>
         <LinearGradient
-          colors={['transparent', '#0E0B10']}
+          colors={['rgba(10,10,12,0.55)', 'rgba(10,10,12,0.78)', colors.bg]}
+          locations={[0, 0.45, 0.78]}
           style={StyleSheet.absoluteFill}
-          pointerEvents="none"
         />
       </View>
 
-      <View style={styles.logoRow}>
-        <Logo size={38} />
-      </View>
+      <View style={[styles.top, { paddingTop: insets.top + 14 }]}><Logo size={28} /></View>
 
-      <View style={styles.panel}>
-        <Text style={styles.title}>Your Entertainment{'\n'}Starts Right Here Today</Text>
-        <Text style={styles.sub}>
-          Discover movies, series, sports and news. Stream anytime, anywhere, effortlessly.
-        </Text>
+      <View style={{ flex: 1 }} />
+
+      <View style={[styles.bottom, { minHeight: height * 0.36, paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
+        <Text style={styles.title}>Unlimited movies,{'\n'}series and more.</Text>
+        <Text style={styles.sub}>Watch anywhere. Pick up right where you stopped.</Text>
+
         <View style={{ height: 22 }} />
-        <Button label="Get Started" onPress={() => navigation.navigate('Login', { mode: 'signup' })} />
+        <Button label="Get started" onPress={() => navigation.navigate('Login', { mode: 'signup' })} />
         <View style={{ height: 12 }} />
-        <Button label="Sign In" variant="glass" onPress={() => navigation.navigate('Login', { mode: 'signin' })} />
+        <Button label="Sign in" variant="secondary" onPress={() => navigation.navigate('Login', { mode: 'signin' })} />
+
+        <Pressable onPress={openSupport} style={styles.help} hitSlop={8}>
+          <Icon name="send" size={15} color={colors.muted} />
+          <Text style={styles.helpText}>Need help? Contact support</Text>
+        </Pressable>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  collage: {
-    position: 'absolute',
-    top: -30,
-    left: -20,
-    right: -20,
-    height: '62%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    transform: [{ rotate: '-7deg' }, { scale: 1.12 }],
-    opacity: 0.9,
-  },
-  tile: {
-    width: '29%',
-    aspectRatio: 2 / 3,
-    margin: '2%',
-    borderRadius: radius.md,
-  },
-  logoRow: { alignItems: 'center', marginTop: 14 },
-  panel: {
-    marginTop: 'auto',
-    margin: 16,
-    padding: 22,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(30,26,32,0.88)',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 26,
-    fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 33,
-  },
-  sub: {
-    color: colors.muted,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 10,
-    lineHeight: 20,
-  },
+  top: { paddingHorizontal: 22, paddingTop: 14 },
+  bottom: { paddingHorizontal: 22, paddingBottom: 16, justifyContent: 'flex-end' },
+  title: { color: colors.text, fontSize: 34, fontWeight: '900', letterSpacing: -0.8, lineHeight: 40 },
+  sub: { color: colors.textDim, fontSize: 15, marginTop: 10, lineHeight: 22 },
+  help: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20 },
+  helpText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
 });

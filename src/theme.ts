@@ -1,15 +1,35 @@
+// CineHub design tokens. One place for every colour, size and shadow in the app.
 export const colors = {
-  bg: '#0E0B10',
-  bgGradient: ['#0B0F14', '#1A1216', '#4A222C'] as const,
-  amber: ['#FFD84A', '#FF9A1F'] as const,
-  amberSolid: '#FFB92E',
+  bg: '#0A0A0C',
+  surface: '#141418',
+  surface2: '#1C1C22',
+  surface3: '#26262E',
+  border: 'rgba(255,255,255,0.08)',
+  borderStrong: 'rgba(255,255,255,0.16)',
   text: '#FFFFFF',
-  muted: 'rgba(255,255,255,0.62)',
-  glass: 'rgba(255,255,255,0.08)',
-  glassStrong: 'rgba(255,255,255,0.14)',
-  border: 'rgba(255,255,255,0.16)',
-  danger: '#FF7A7A',
-  onAmber: '#1A1208',
+  textDim: 'rgba(255,255,255,0.74)',
+  muted: 'rgba(255,255,255,0.5)',
+  accent: '#E50914',
+  accentPressed: '#B8070F',
+  onAccent: '#FFFFFF',
+  gold: '#F5C518',
+  success: '#3DDC84',
+  danger: '#FF5A5F',
+  overlay: 'rgba(0,0,0,0.6)',
+  scrim: ['rgba(10,10,12,0)', 'rgba(10,10,12,0.75)', '#0A0A0C'] as const,
 };
 
-export const radius = { sm: 12, md: 18, lg: 28, pill: 999 };
+export const radius = { xs: 6, sm: 10, md: 14, lg: 20, xl: 28, pill: 999 };
+
+export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 };
+
+export const type = {
+  h1: { fontSize: 30, fontWeight: '800' as const, letterSpacing: -0.5 },
+  h2: { fontSize: 22, fontWeight: '800' as const, letterSpacing: -0.3 },
+  h3: { fontSize: 17, fontWeight: '700' as const },
+  body: { fontSize: 14, lineHeight: 21 },
+  small: { fontSize: 12, lineHeight: 17 },
+};
+
+export const SUPPORT_URL = 'https://t.me/rnexflix';
+export const APP_VERSION = '2.0.0';
