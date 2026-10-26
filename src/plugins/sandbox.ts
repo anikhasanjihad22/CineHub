@@ -291,6 +291,17 @@ function pickQuality(s: any): string | undefined {
   return m ? m[0].toLowerCase() : undefined;
 }
 
+function pickInfo(o: any): string | undefined {
+  if (!o || typeof o !== 'object') return undefined;
+  const parts: string[] = [];
+  for (const k of ['name', 'title', 'description', 'language', 'lang', 'audio', 'label', 'server', 'source']) {
+    const v = o[k];
+    if (typeof v === 'string' && v) parts.push(v);
+    else if (Array.isArray(v)) for (const x of v) if (typeof x === 'string') parts.push(x);
+  }
+  return parts.length ? parts.join(' ').slice(0, 400) : undefined;
+}
+
 export function cleanStreams(raw: any): Stream[] {
   const out: Stream[] = [];
   const seen = new Set<string>();
@@ -306,7 +317,7 @@ export function cleanStreams(raw: any): Stream[] {
     if (obj.format === 'hls' || obj.format === 'dash' || obj.format === 'mp4') format = obj.format;
     else if (obj.type === 'hls' || obj.type === 'dash' || obj.isM3U8 === true) format = obj.type === 'dash' ? 'dash' : 'hls';
     else format = guessFormat(url);
-    out.push({ url, format, quality: pickQuality(obj), headers: pickHeaders(obj) });
+    out.push({ url, format, quality: pickQuality(obj), headers: pickHeaders(obj), info: pickInfo(obj) });
   }
   return out;
 }

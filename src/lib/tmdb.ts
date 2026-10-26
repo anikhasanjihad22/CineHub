@@ -76,6 +76,13 @@ function list(res: any, t?: MediaType): Title[] {
 export const trending = async (t: MediaType) => list(await call(`/trending/${t}/week`), t);
 export const popular = async (t: MediaType, page = 1) => list(await call(`/${t}/popular`, { page }), t);
 export const topRated = async (t: MediaType) => list(await call(`/${t}/top_rated`), t);
+export type DiscoverParams = Record<string, string | number>;
+
+// Any TMDB "discover" list, e.g. Hindi movies or Japanese animation.
+export async function discoverBy(t: MediaType, params: DiscoverParams, page = 1) {
+  return list(await call(`/discover/${t}`, { sort_by: 'popularity.desc', 'vote_count.gte': 20, ...params, page }), t);
+}
+
 export const similar = async (t: MediaType, id: number) => list(await call(`/${t}/${id}/recommendations`), t);
 export const searchTitles = async (q: string) => list(await call('/search/multi', { query: q }));
 

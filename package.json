@@ -1,6 +1,6 @@
 {
   "name": "cinehub",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -15,7 +15,11 @@
     "crypto-js": "^4.2.0",
     "expo": "~57.0.0",
     "expo-build-properties": "~57.0.22",
+    "expo-file-system": "~57.0.0",
+    "expo-image-picker": "~57.0.0",
+    "expo-intent-launcher": "~57.0.0",
     "expo-linear-gradient": "~57.0.2",
+    "expo-navigation-bar": "~57.0.0",
     "expo-screen-orientation": "~57.0.0",
     "expo-status-bar": "~57.0.1",
     "expo-video": "~57.0.5",

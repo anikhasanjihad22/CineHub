@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
+  ActivityIndicator, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
+import { isTV } from '../lib/platform';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,20 +14,21 @@ import { Icon, IconName } from '../components/Icon';
 import { Button } from '../components/Button';
 import { Chips } from '../components/Chips';
 import { SeekBar } from '../components/SeekBar';
-import { colors, radius } from '../theme';
-import { resolveStreams } from '../plugins/resolver';
+import { colors, FILL, radius } from '../theme';
+import { langTag, resolveStreams } from '../plugins/resolver';
 import { resolveCatalogLinks } from '../plugins/catalog';
 import type { Stream } from '../plugins/types';
 import { getProgress, saveProgress } from '../lib/store';
 import { openSupport } from '../lib/support';
+import { dlId, formatSize, startDownload, useDownloads } from '../lib/downloads';
 import { details, img, seasonEpisodes } from '../lib/tmdb';
 
-const START_TIMEOUT = 25_000;
+const START_TIMEOUT = 15_000; // a server that has not started in 15 seconds is skipped
 const AUTONEXT_KEY = 'cinehub:autonext';
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 type Ep = { number: number; name: string; overview: string; still: string | null; runtime: number };
-type Panel = null | 'speed' | 'tracks' | 'episodes';
+type Panel = null | 'menu' | 'servers' | 'speed' | 'tracks' | 'episodes';
 
 function fmt(sec: number) {
   const s = Math.max(0, Math.floor(sec || 0));
@@ -45,11 +48,24 @@ function RoundBtn({ icon, onPress, size = 24, label }: { icon: IconName; onPress
   );
 }
 
+function MenuRow({ icon, label, value, onPress }: { icon: IconName; label: string; value?: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.opt}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
+        <Icon name={icon} size={22} />
+        <Text style={styles.optText}>{label}</Text>
+      </View>
+      {!!value && <Text style={styles.menuVal}>{value}</Text>}
+    </Pressable>
+  );
+}
+
 export default function Player({ route, navigation }: any) {
   const p = route.params;
   const pRef = useRef(p);
   pRef.current = p;
   const isTmdb = p.kind === 'tmdb';
+  const isLocal = p.kind === 'local'; // a downloaded file: plays with no internet
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
@@ -68,10 +84,8 @@ export default function Player({ route, navigation }: any) {
   const resumedRef = useRef(false);
   const startTimer = useRef<any>(null);
   const errIdx = useRef(-1);
-  const autoFullDone = useRef(false);
 
   // ---- ui state ----
-  const [forceFull, setForceFull] = useState(false);
   const [visible, setVisible] = useState(true);
   const [locked, setLocked] = useState(false);
   const [lockHint, setLockHint] = useState(false);
@@ -102,7 +116,6 @@ export default function Player({ route, navigation }: any) {
   const [countdown, setCountdown] = useState(0);
 
   const unavailable = !searching && (phase === 'none' || allFailed);
-  const fullscreen = forceFull || width > height;
   const fade = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef<any>(null);
   const lastTap = useRef(0);
@@ -115,24 +128,30 @@ export default function Player({ route, navigation }: any) {
   });
 
   // ------------------------------------------------------------------ orientation
-  const enterFull = useCallback(async () => {
-    setForceFull(true);
-    try { await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE); } catch {}
-  }, []);
-
-  const exitFull = useCallback(async () => {
-    setForceFull(false);
-    try { await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP); } catch {}
-  }, []);
-
+  // Opening the player turns the phone to landscape by itself; leaving puts it back to portrait.
   useEffect(() => {
+    if (isTV) return; // a TV is always landscape
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
     const restore = () => { ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {}); };
     const unsub = navigation.addListener('beforeRemove', restore);
     return () => { unsub(); restore(); };
   }, [navigation]);
 
-  // The "not available" page is a normal portrait page.
-  useEffect(() => { if (unavailable && forceFull) exitFull(); }, [unavailable]);
+  // Full-screen video: hide the phone's own navigation bar (back / home / recents) so it never sits on top of the picture.
+  // Swiping from the screen edge shows it for a moment, then it hides again.
+  useEffect(() => {
+    if (Platform.OS !== 'android' || isTV) return;
+    const hide = () => {
+      NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+      try { (NavigationBar as any).setBehaviorAsync?.('overlay-swipe')?.catch?.(() => {}); } catch {}
+    };
+    hide();
+    const sub = (NavigationBar as any).addVisibilityListener?.(({ visibility }: any) => { if (visibility === 'visible') setTimeout(hide, 2500); });
+    return () => {
+      sub?.remove?.();
+      NavigationBar.setVisibilityAsync('visible').catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(AUTONEXT_KEY).then((v) => { if (v === '0') setAutoNext(false); }).catch(() => {});
@@ -145,6 +164,12 @@ export default function Player({ route, navigation }: any) {
     serversRef.current = []; idxRef.current = 0; errIdx.current = -1;
     setServers([]); setIdx(0); setPhase('loading'); setAllFailed(false); setSearching(true);
     setStarted(false); setEnded(false); setCountdown(0); setPos(0); setDur(0);
+    if (isLocal) {
+      const one: Stream[] = [{ url: p.localUri, format: p.format === 'hls' ? 'hls' : 'mp4', label: 'Offline' }];
+      serversRef.current = one;
+      setServers(one); setPhase('ready'); setSearching(false);
+      return () => { alive = false; };
+    }
     (async () => {
       try {
         if (isTmdb) {
@@ -244,8 +269,6 @@ export default function Player({ route, navigation }: any) {
           try { player.currentTime = resumeRef.current; } catch {}
         }
         readTracks();
-        // Like a TV app: playing starts in landscape.
-        if (!autoFullDone.current) { autoFullDone.current = true; enterFull(); }
       } else if (e.status === 'error') {
         clearTimeout(startTimer.current);
         if (errIdx.current === idxRef.current) return;
@@ -418,9 +441,48 @@ export default function Player({ route, navigation }: any) {
     setCurAud(t);
   }
 
+  // ---- 3-dot menu: server choice and download ----
+  const dls = useDownloads();
+  const dl = isTmdb ? dls.find((d) => d.id === dlId(p.type, p.tmdbId, p.season ?? 0, p.episode ?? 0)) : undefined;
+
+  function pickServer(i: number) {
+    setPanel(null);
+    if (i === idxRef.current && started) return;
+    try { resumeRef.current = Math.max(player.currentTime || 0, 0); } catch {}
+    setStarted(false);
+    setAllFailed(false);
+    errIdx.current = -1;
+    idxRef.current = i;
+    setIdx(i);
+    flashMsg(`Server ${i + 1}`);
+  }
+
+  function flashMsg(t: string) {
+    setFlash(t);
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(''), 1400);
+  }
+
+  function download() {
+    setPanel(null);
+    if (!isTmdb || (dl && (dl.status === 'done' || dl.status === 'downloading'))) return;
+    // the working server first, then the others as a back-up
+    const order = [servers[idx], ...servers.filter((_, i) => i !== idx)].filter(Boolean) as Stream[];
+    if (!order.length) return flashMsg('No server to download from');
+    startDownload(
+      {
+        tmdbId: p.tmdbId, type: p.type, season: p.season, episode: p.episode, title: p.title,
+        subtitle: p.type === 'tv' ? `S${curSeason}:E${curEp}${epName ? '  ' + epName : ''}` : p.year ?? '',
+        posterUrl: p.poster ? img(p.poster, 'w342') : null,
+      },
+      order,
+    ).catch(() => {});
+    flashMsg('Download started. See the Downloads tab.');
+  }
+
   const hasTracks = subs.length > 0 || auds.length > 1;
   const epName = eps.find((x) => x.number === curEp)?.name;
-  const subTitle = isTmdb && p.type === 'tv' ? `S${curSeason}:E${curEp}${epName ? '  ' + epName : ''}` : '';
+  const subTitle = isLocal ? (p.subtitle ?? '') : isTmdb && p.type === 'tv' ? `S${curSeason}:E${curEp}${epName ? '  ' + epName : ''}` : '';
 
   // ------------------------------------------------------------------ "not available" screen
   if (unavailable) {
@@ -428,37 +490,32 @@ export default function Player({ route, navigation }: any) {
       <Screen>
         <StatusBar hidden={false} />
         <Pressable onPress={close} style={styles.backPlain} hitSlop={8}><Icon name="back" size={22} /></Pressable>
-        <View style={styles.na}>
-          <View style={styles.naIcon}><Icon name="info" size={34} color={colors.muted} /></View>
+        <ScrollView contentContainerStyle={styles.na} showsVerticalScrollIndicator={false}>
+          <View style={styles.naIcon}><Icon name="info" size={30} color={colors.muted} /></View>
           <Text style={styles.naTitle}>Not available</Text>
           <Text style={styles.naText}>
             {p.title ? `"${p.title}" ` : 'This title '}is not available right now. It may be added soon, so please try again later.
           </Text>
-          <View style={{ width: '100%', marginTop: 26, gap: 10 }}>
-            <Button label="Try again" icon="refresh" variant="light" onPress={() => setAttempt((a) => a + 1)} />
-            <Button label="Contact support" icon="send" variant="secondary" onPress={openSupport} />
+          <View style={styles.naBtns}>
+            <Button label="Try again" icon="refresh" variant="light" onPress={() => setAttempt((a) => a + 1)} style={{ flex: 1 }} />
+            <Button label="Support" icon="send" variant="secondary" onPress={openSupport} style={{ flex: 1 }} />
           </View>
-        </View>
+        </ScrollView>
       </Screen>
     );
   }
 
   const showSpinner = !started || buffering;
-  const sidePad = fullscreen
-    ? { paddingLeft: Math.max(insets.left, 24), paddingRight: Math.max(insets.right, 24) }
-    : { paddingHorizontal: 12 };
-  const boxStyle = fullscreen ? StyleSheet.absoluteFill : { width, height: Math.round((width * 9) / 16) };
+  const sidePad = { paddingLeft: Math.max(insets.left, 24), paddingRight: Math.max(insets.right, 24) };
 
   return (
     <View style={styles.root}>
-      <StatusBar hidden={fullscreen} />
-      <View style={{ height: fullscreen ? 0 : insets.top, backgroundColor: '#000' }} />
-
-      <View style={[boxStyle as any, styles.box]}>
-        <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} allowsFullscreen={false} contentFit={fit} />
+      <StatusBar hidden />
+      <View style={[FILL, styles.box]}>
+        <VideoView player={player} style={FILL} nativeControls={false} allowsFullscreen={false} contentFit={fit} />
 
         {/* tap layer: tap = show / hide controls, double tap = skip 10 seconds */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onTap} />
+        <Pressable style={FILL} onPress={onTap} />
 
         {showSpinner && (
           <View style={styles.center} pointerEvents="none">
@@ -473,31 +530,32 @@ export default function Player({ route, navigation }: any) {
           </View>
         )}
 
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fade }]} pointerEvents={visible && !locked ? 'box-none' : 'none'}>
+        <Animated.View style={[FILL, { opacity: fade }]} pointerEvents={visible && !locked ? 'box-none' : 'none'}>
           <View style={styles.dim} pointerEvents="none" />
 
           {/* top bar */}
-          <View style={[styles.topBar, sidePad, { paddingTop: fullscreen ? Math.max(insets.top, 14) : 8 }]}>
+          <View style={[styles.topBar, sidePad, { paddingTop: Math.max(insets.top, 14) }]}>
             <RoundBtn icon="back" onPress={close} />
             <View style={{ flex: 1, marginLeft: 8 }}>
               <Text style={styles.title} numberOfLines={1}>{p.title}</Text>
               {!!subTitle && <Text style={styles.subtitle} numberOfLines={1}>{subTitle}</Text>}
             </View>
+            <RoundBtn icon="more" size={26} onPress={() => setPanel('menu')} />
           </View>
 
           {/* centre buttons */}
           {started && !showSpinner && (
             <View style={styles.centerRow} pointerEvents="box-none">
-              <Pressable onPress={() => skip(-10)} hitSlop={10} style={styles.skipBtn}><Icon name="rewind" size={fullscreen ? 38 : 30} /></Pressable>
-              <Pressable onPress={togglePlay} hitSlop={10} style={[styles.playBtn, fullscreen && { width: 74, height: 74, borderRadius: 37 }]}>
-                <Icon name={playing ? 'pause' : 'play'} size={fullscreen ? 38 : 30} />
+              <Pressable onPress={() => skip(-10)} hitSlop={10} style={styles.skipBtn}><Icon name="rewind" size={38} /></Pressable>
+              <Pressable onPress={togglePlay} hitSlop={10} style={[styles.playBtn, { width: 74, height: 74, borderRadius: 37 }]}>
+                <Icon name={playing ? 'pause' : 'play'} size={38} />
               </Pressable>
-              <Pressable onPress={() => skip(10)} hitSlop={10} style={styles.skipBtn}><Icon name="forward" size={fullscreen ? 38 : 30} /></Pressable>
+              <Pressable onPress={() => skip(10)} hitSlop={10} style={styles.skipBtn}><Icon name="forward" size={38} /></Pressable>
             </View>
           )}
 
           {/* bottom bar */}
-          <View style={[styles.bottomBar, sidePad, { paddingBottom: fullscreen ? Math.max(insets.bottom, 14) : 6 }]}>
+          <View style={[styles.bottomBar, sidePad, { paddingBottom: Math.max(insets.bottom, 14) }]}>
             <View style={styles.timeRow}>
               <Text style={styles.time}>{fmt(pos)}</Text>
               <View style={{ flex: 1 }} />
@@ -509,17 +567,13 @@ export default function Player({ route, navigation }: any) {
               onCommit={(t) => { setScrubbing(false); seekTo(t); }}
             />
             <View style={styles.tools}>
-              <RoundBtn icon="speed" size={22} label={fullscreen ? (speed === 1 ? 'Speed' : `${speed}x`) : undefined} onPress={() => setPanel('speed')} />
-              <RoundBtn icon="aspect" size={22} label={fullscreen ? (fit === 'contain' ? 'Fit' : 'Fill') : undefined} onPress={() => setFit((f) => (f === 'contain' ? 'cover' : 'contain'))} />
-              {hasTracks && <RoundBtn icon="subtitles" size={22} label={fullscreen ? 'Audio & subtitles' : undefined} onPress={() => { readTracks(); setPanel('tracks'); }} />}
-              {isTmdb && p.type === 'tv' && <RoundBtn icon="episodes" size={22} label={fullscreen ? 'Episodes' : undefined} onPress={() => { setPanelSeason(curSeason); setPanel('episodes'); }} />}
-              {!!nextEp && <RoundBtn icon="next" size={22} label={fullscreen ? 'Next' : undefined} onPress={() => goEpisode(nextEp!.season, nextEp!.episode)} />}
+              <RoundBtn icon="speed" size={22} label={speed === 1 ? 'Speed' : `${speed}x`} onPress={() => setPanel('speed')} />
+              <RoundBtn icon="aspect" size={22} label={fit === 'contain' ? 'Fit' : 'Fill'} onPress={() => setFit((f) => (f === 'contain' ? 'cover' : 'contain'))} />
+              {hasTracks && <RoundBtn icon="subtitles" size={22} label="Audio & subtitles" onPress={() => { readTracks(); setPanel('tracks'); }} />}
+              {isTmdb && p.type === 'tv' && <RoundBtn icon="episodes" size={22} label="Episodes" onPress={() => { setPanelSeason(curSeason); setPanel('episodes'); }} />}
+              {!!nextEp && <RoundBtn icon="next" size={22} label="Next" onPress={() => goEpisode(nextEp!.season, nextEp!.episode)} />}
               <View style={{ flex: 1 }} />
-              <RoundBtn icon="lock" size={22} label={fullscreen ? 'Lock' : undefined} onPress={() => { setLocked(true); setVisible(false); }} />
-              <RoundBtn
-                icon={fullscreen ? 'fullscreen-exit' : 'fullscreen'} size={24}
-                label={fullscreen ? 'Exit' : undefined} onPress={() => (fullscreen ? exitFull() : enterFull())}
-              />
+              <RoundBtn icon="lock" size={22} label="Lock" onPress={() => { setLocked(true); setVisible(false); }} />
             </View>
           </View>
         </Animated.View>
@@ -534,7 +588,7 @@ export default function Player({ route, navigation }: any) {
         )}
 
         {upNext && (
-          <View style={[styles.upNext, { right: Math.max(insets.right, 16), bottom: fullscreen ? 90 : 60 }]}>
+          <View style={[styles.upNext, { right: Math.max(insets.right, 16), bottom: 96 }]}>
             <Text style={styles.upLabel}>Up next</Text>
             <Text style={styles.upTitle} numberOfLines={1}>Season {nextEp!.season}, Episode {nextEp!.episode}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
@@ -550,63 +604,59 @@ export default function Player({ route, navigation }: any) {
         )}
       </View>
 
-      {/* below the video (portrait only) */}
-      {!fullscreen && (
-        <ScrollView
-          style={{ flex: 1, backgroundColor: colors.bg }}
-          contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 20) + 10 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.infoTitle}>{p.title}</Text>
-          {!!subTitle && <Text style={styles.infoSub}>{subTitle}</Text>}
-
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-            <Button label="Fullscreen" small icon="fullscreen" variant="secondary" onPress={enterFull} />
-            {!!nextEp && <Button label="Next episode" small icon="next" variant="secondary" onPress={() => goEpisode(nextEp!.season, nextEp!.episode)} />}
-          </View>
-
-          {isTmdb && p.type === 'tv' && eps.length > 0 && (
-            <View style={{ marginTop: 26 }}>
-              <Text style={styles.infoHead}>Season {curSeason} episodes</Text>
-              <View style={{ gap: 14, marginTop: 12 }}>
-                {eps.map((e) => {
-                  const on = e.number === curEp;
-                  return (
-                    <Pressable key={e.number} onPress={() => (on ? null : goEpisode(curSeason, e.number))} style={styles.epRow}>
-                      <View style={styles.epThumb}>
-                        {e.still && <Image source={{ uri: img(e.still, 'w300')! }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
-                        <View style={styles.epPlay}><Icon name={on ? 'check' : 'play'} size={13} /></View>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.epTitle, on && { color: colors.accent }]} numberOfLines={1}>{e.number}. {e.name}</Text>
-                        {!!e.runtime && <Text style={styles.epMeta}>{e.runtime} min</Text>}
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-        </ScrollView>
-      )}
-
       {/* side sheet (landscape) / bottom sheet (portrait) */}
       <Modal visible={!!panel} transparent animationType="fade" onRequestClose={() => setPanel(null)} statusBarTranslucent>
-        <Pressable style={[styles.backdrop, fullscreen && { alignItems: 'flex-end' }]} onPress={() => setPanel(null)}>
+        <Pressable style={[styles.backdrop, { alignItems: 'flex-end' }]} onPress={() => setPanel(null)}>
           <Pressable
             onPress={() => {}}
-            style={[
-              styles.sheet,
-              fullscreen
-                ? { width: Math.min(360, width * 0.55), height: '100%', borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }
-                : { width: '100%', maxHeight: '75%', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-            ]}
+            style={[styles.sheet, { width: Math.min(360, width * 0.55), height: '100%', borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }]}
           >
             <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>{panel === 'speed' ? 'Playback speed' : panel === 'tracks' ? 'Audio & subtitles' : 'Episodes'}</Text>
+              <Text style={styles.sheetTitle}>{panel === 'menu' ? 'Options' : panel === 'servers' ? 'Choose server' : panel === 'speed' ? 'Playback speed' : panel === 'tracks' ? 'Audio & subtitles' : 'Episodes'}</Text>
               <Pressable onPress={() => setPanel(null)} hitSlop={10}><Icon name="close" size={22} /></Pressable>
             </View>
             <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+              {panel === 'menu' && (
+                <>
+                  {!isLocal && (
+                    <MenuRow icon="server" label="Server" value={servers.length ? `Server ${idx + 1}` : '...'} onPress={() => setPanel('servers')} />
+                  )}
+                  {isTmdb && (
+                    <MenuRow
+                      icon={dl?.status === 'done' ? 'check' : 'download'}
+                      label={dl?.status === 'done' ? 'Downloaded' : dl?.status === 'downloading' ? 'Downloading...' : dl?.status === 'error' ? 'Download again' : 'Download'}
+                      value={dl?.status === 'downloading' ? (dl.progress < 0 ? formatSize(dl.size) : `${Math.round(dl.progress * 100)}%`) : ''}
+                      onPress={download}
+                    />
+                  )}
+                  <MenuRow icon="speed" label="Playback speed" value={speed === 1 ? 'Normal' : `${speed}x`} onPress={() => setPanel('speed')} />
+                  {hasTracks && <MenuRow icon="subtitles" label="Audio & subtitles" onPress={() => { readTracks(); setPanel('tracks'); }} />}
+                  <MenuRow icon="aspect" label="Picture" value={fit === 'contain' ? 'Fit' : 'Fill'} onPress={() => { setFit((f) => (f === 'contain' ? 'cover' : 'contain')); setPanel(null); }} />
+                  {isTmdb && p.type === 'tv' && <MenuRow icon="episodes" label="Episodes" onPress={() => { setPanelSeason(curSeason); setPanel('episodes'); }} />}
+                </>
+              )}
+
+              {panel === 'servers' && (
+                <>
+                  {servers.length === 0 && <ActivityIndicator color="#fff" style={{ marginTop: 20 }} />}
+                  {servers.map((sv, i) => {
+                    const on = i === idx;
+                    const tag = [langTag(sv), sv.quality].filter(Boolean).join(' · ');
+                    return (
+                      <Pressable key={sv.url} onPress={() => pickServer(i)} style={styles.opt}>
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text style={[styles.optText, on && { fontWeight: '800' }]}>Server {i + 1}</Text>
+                          {!!tag && <Text style={styles.epMeta}>{tag}</Text>}
+                        </View>
+                        {on && <Icon name="check" size={20} color={colors.accent} />}
+                      </Pressable>
+                    );
+                  })}
+                  {searching && servers.length > 0 && <Text style={[styles.epMeta, { marginTop: 14 }]}>Looking for more servers...</Text>}
+                  <Text style={[styles.epMeta, { marginTop: 14, lineHeight: 18 }]}>If a server does not play, pick another one. The app also switches by itself when a server fails.</Text>
+                </>
+              )}
+
               {panel === 'speed' && SPEEDS.map((r) => (
                 <Pressable key={r} onPress={() => setRate(r)} style={styles.opt}>
                   <Text style={[styles.optText, r === speed && { fontWeight: '800' }]}>{r === 1 ? 'Normal' : `${r}x`}</Text>
@@ -682,15 +732,15 @@ export default function Player({ route, navigation }: any) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   box: { backgroundColor: '#000', overflow: 'hidden' },
-  center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  center: { ...FILL, alignItems: 'center', justifyContent: 'center' },
   loadText: { color: colors.textDim, marginTop: 10, fontSize: 13 },
-  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  dim: { ...FILL, backgroundColor: 'rgba(0,0,0,0.5)' },
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', paddingBottom: 8 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' },
   subtitle: { color: colors.textDim, fontSize: 12, marginTop: 2 },
   rbtn: { alignItems: 'center', justifyContent: 'center', minWidth: 40, height: 44, paddingHorizontal: 6 },
   rlabel: { color: '#fff', fontSize: 11, fontWeight: '600', marginTop: 2 },
-  centerRow: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 40 },
+  centerRow: { ...FILL, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 40 },
   skipBtn: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   playBtn: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)' },
   bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0 },
@@ -723,10 +773,12 @@ const styles = StyleSheet.create({
   sheetTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
   opt: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   optText: { color: '#fff', fontSize: 15 },
+  menuVal: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   optGroup: { color: colors.muted, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 14, marginBottom: 4 },
   backPlain: { width: 44, height: 44, margin: 10, alignItems: 'center', justifyContent: 'center' },
-  na: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 60 },
-  naIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
-  naTitle: { color: colors.text, fontSize: 24, fontWeight: '900', marginTop: 20 },
+  na: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 30, maxWidth: 520, alignSelf: 'center', width: '100%' },
+  naBtns: { flexDirection: 'row', gap: 10, width: '100%', marginTop: 22 },
+  naIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  naTitle: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 14 },
   naText: { color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 22 },
 });

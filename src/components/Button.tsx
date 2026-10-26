@@ -1,5 +1,6 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Focusable } from './Focusable';
 import { Icon, IconName } from './Icon';
 import { colors, radius } from '../theme';
 
@@ -34,8 +35,9 @@ const FG: Record<Variant, string> = {
 export function Button({ label, onPress, variant = 'primary', loading, disabled, icon, small, style }: Props) {
   const fg = FG[variant];
   return (
-    <Pressable
+    <Focusable
       onPress={onPress}
+      ring={radius.md + 3}
       disabled={loading || disabled}
       style={({ pressed }) => [
         styles.base,
@@ -53,13 +55,13 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
           <Text style={[styles.label, small && { fontSize: 13 }, { color: fg }]}>{label}</Text>
         </View>
       )}
-    </Pressable>
+    </Focusable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { height: 52, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  small: { height: 38, paddingHorizontal: 14 },
+  base: { height: 54, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  small: { height: 40, paddingHorizontal: 16, borderRadius: radius.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   label: { fontSize: 16, fontWeight: '700' },
 });

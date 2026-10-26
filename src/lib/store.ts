@@ -75,3 +75,22 @@ export async function saveProgress(p: {
     { onConflict: 'user_id,tmdb_id,media_type,season,episode' },
   );
 }
+
+// Same as recentHistory, but also tells how far along each title is (0..1) for the progress bar under the poster.
+export async function recentProgress(type: MediaType): Promise<{ id: number; ratio: number }[]> {
+  const { data } = await supabase
+    .from('watch_history')
+    .select('tmdb_id,media_type,progress_seconds,duration_seconds,updated_at')
+    .eq('media_type', type)
+    .order('updated_at', { ascending: false })
+    .limit(30);
+  const seen = new Set<number>();
+  const out: { id: number; ratio: number }[] = [];
+  for (const r of (data ?? []) as any[]) {
+    if (seen.has(r.tmdb_id)) continue;
+    seen.add(r.tmdb_id);
+    const ratio = r.duration_seconds > 0 ? r.progress_seconds / r.duration_seconds : 0;
+    if (ratio < 0.95) out.push({ id: r.tmdb_id, ratio: Math.max(0.03, Math.min(ratio, 0.97)) });
+  }
+  return out.slice(0, 10);
+}

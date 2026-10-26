@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
+import { Focusable } from './Focusable';
 import { colors, radius } from '../theme';
 
 // Horizontal filter pills (Home categories, seasons).
@@ -15,9 +16,9 @@ export function Chips({ items, value, onChange, padded = true }: {
       {items.map((it) => {
         const active = it.key === value;
         return (
-          <Pressable key={it.key} onPress={() => onChange(it.key)} style={[styles.chip, active && styles.active]}>
+          <Focusable key={it.key} onPress={() => onChange(it.key)} ring={20} style={[styles.chip, active && styles.active]}>
             <Text style={[styles.text, active && styles.activeText]}>{it.label}</Text>
-          </Pressable>
+          </Focusable>
         );
       })}
     </ScrollView>

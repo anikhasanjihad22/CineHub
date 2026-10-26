@@ -6,7 +6,7 @@ export type IconName =
   | 'chevron-right' | 'close' | 'info' | 'bookmark' | 'settings' | 'logout' | 'shield' | 'refresh' | 'send'
   | 'help' | 'fullscreen' | 'fullscreen-exit' | 'rewind' | 'forward' | 'speed' | 'lock' | 'unlock'
   | 'episodes' | 'next' | 'subtitles' | 'trash' | 'edit' | 'flask' | 'plug' | 'star' | 'mail' | 'eye' | 'eye-off'
-  | 'aspect';
+  | 'aspect' | 'more' | 'download' | 'server' | 'downloads';
 
 type Props = { name: IconName; size?: number; color?: string; filled?: boolean };
 
@@ -53,6 +53,10 @@ export function Icon({ name, size = 22, color = '#fff', filled = false }: Props)
       {name === 'eye' && (<><Path d="M2.8 12S6 5.8 12 5.8 21.2 12 21.2 12 18 18.2 12 18.2 2.8 12 2.8 12z" {...s} /><Circle cx={12} cy={12} r={2.8} {...s} /></>)}
       {name === 'eye-off' && (<><Path d="M4 4l16 16" {...s} /><Path d="M9.8 6.2A8.7 8.7 0 0 1 12 5.8c6 0 9.2 6.2 9.2 6.2a15 15 0 0 1-3 3.6M6.3 7.9A15 15 0 0 0 2.8 12S6 18.2 12 18.2a8.8 8.8 0 0 0 3.5-.7" {...s} /></>)}
       {name === 'aspect' && (<><Rect x={3.5} y={6.5} width={17} height={11} rx={2} {...s} /><Path d="M8 10.5v-1.5h1.5M16 13.5v1.5h-1.5" {...s} /></>)}
+      {name === 'more' && (<><Circle cx={12} cy={5.5} r={1.7} fill={color} /><Circle cx={12} cy={12} r={1.7} fill={color} /><Circle cx={12} cy={18.5} r={1.7} fill={color} /></>)}
+      {name === 'download' && <Path d="M12 4.5v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14" {...s} />}
+      {name === 'downloads' && (<><Path d="M12 4v9M8 9.5l4 4 4-4" {...s} /><Path d="M4.5 14.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" {...s} /></>)}
+      {name === 'server' && (<><Rect x={4} y={4.5} width={16} height={6} rx={1.8} {...s} /><Rect x={4} y={13.5} width={16} height={6} rx={1.8} {...s} /><Circle cx={7.8} cy={7.5} r={0.8} fill={color} /><Circle cx={7.8} cy={16.5} r={0.8} fill={color} /></>)}
     </Svg>
   );
 }

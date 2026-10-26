@@ -5,11 +5,11 @@ import { Icon } from '../components/Icon';
 import { PosterGrid } from '../components/Poster';
 import { Button } from '../components/Button';
 import { colors } from '../theme';
-import { discover, img, Title } from '../lib/tmdb';
+import { discover, discoverBy, img, Title } from '../lib/tmdb';
 
 // Titles of one streaming platform (opened from the platform logo row).
 export default function ListScreen({ route, navigation }: any) {
-  const { title, type, providerId } = route.params;
+  const { title, type, providerId, params } = route.params;
   const [items, setItems] = useState<Title[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,7 @@ export default function ListScreen({ route, navigation }: any) {
   async function load(p: number, reset = false) {
     setLoading(true);
     try {
-      const more = await discover(type, providerId, p);
+      const more = params ? await discoverBy(type, params, p) : await discover(type, providerId, p);
       setItems((cur) => {
         const base = reset ? [] : cur;
         const seen = new Set(base.map((x) => x.id));

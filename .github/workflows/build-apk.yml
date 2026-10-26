@@ -27,10 +27,13 @@ jobs:
         run: npm install
 
       - name: Install Expo-matched packages
-        run: npx expo install expo-status-bar expo-linear-gradient expo-video expo-screen-orientation expo-build-properties react-native-svg react-native-screens react-native-safe-area-context @react-native-async-storage/async-storage
+        run: npx expo install expo-status-bar expo-linear-gradient expo-video expo-file-system expo-image-picker expo-screen-orientation expo-navigation-bar expo-intent-launcher expo-build-properties react-native-svg react-native-screens react-native-safe-area-context @react-native-async-storage/async-storage
 
       - name: Align versions with the Expo SDK
         run: npx expo install --fix
+
+      - name: Set Android versionCode (must grow with every build so phones accept the update)
+        run: node -e "const fs=require('fs');const j=require('./app.json');j.expo.android.versionCode=${{ github.run_number }}+300;fs.writeFileSync('app.json',JSON.stringify(j,null,2))"
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install

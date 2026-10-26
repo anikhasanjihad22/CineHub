@@ -34,3 +34,11 @@ Open the app, Sign up with your email, then in Supabase > SQL Editor run:
     update public.profiles set role = 'admin' where email = 'YOUR_EMAIL_HERE';
 
 Close and reopen the app: Profile > Manage plugins.
+
+## 5. NEW in v3: update system, Android TV, premium downloads
+- Re-run supabase.sql once (the new part at the bottom creates the app_config table).
+- Install a new version: build the APK, then Profile > Publish app update. Paste
+  https://github.com/YOU/REPO/releases/latest/download/CineHub.apk, type the new version
+  (also change APP_VERSION in src/theme.ts and "version" in app.json to the same number), keep Force update on.
+  Phones with an older version are blocked until they update inside the app.
+- Android TV: the same APK works. Install it on the TV (adb or a USB file manager); CineHub appears on the TV home screen.

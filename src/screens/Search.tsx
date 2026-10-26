@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '../components/Icon';
 import { PosterGrid, SectionTitle } from '../components/Poster';
-import { colors, radius } from '../theme';
+import { colors, NAV_SPACE, radius } from '../theme';
 import { hasKey, img, searchTitles, Title, trending } from '../lib/tmdb';
 import { catalogCategories, loadCatalog } from '../plugins/catalog';
 import type { CatalogItem } from '../plugins/types';
@@ -75,7 +75,7 @@ export default function Search({ navigation }: any) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: NAV_SPACE }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {busy && <ActivityIndicator color={colors.text} style={{ marginTop: 30 }} />}
 
         {!typing && hot.length > 0 && (
@@ -122,9 +122,9 @@ export default function Search({ navigation }: any) {
 
 const styles = StyleSheet.create({
   top: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14 },
-  heading: { color: colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginBottom: 14 },
+  heading: { color: colors.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.8, marginBottom: 14 },
   inputWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, height: 50, borderRadius: radius.sm, paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, borderRadius: radius.md, paddingHorizontal: 14,
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
   },
   input: { flex: 1, color: colors.text, fontSize: 16, padding: 0, height: '100%' },

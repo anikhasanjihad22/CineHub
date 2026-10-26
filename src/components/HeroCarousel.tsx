@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { HeroCard, HeroSlide } from './HeroCard';
 import { colors } from '../theme';
+import { isTV } from '../lib/platform';
 
 export type { HeroSlide } from './HeroCard';
 
 // Swipeable banner with dots. Moves to the next slide by itself every 6 seconds.
 export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const { width } = useWindowDimensions();
-  const height = Math.min(Math.round(width * 1.2), 520);
+  const height = isTV ? Math.round(width * 0.42) : Math.min(Math.round(width * 1.2), 520);
   const [index, setIndex] = useState(0);
   const ref = useRef<FlatList<HeroSlide>>(null);
   const idx = useRef(0);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '../components/Icon';
 import { PosterGrid } from '../components/Poster';
-import { colors } from '../theme';
+import { colors, NAV_SPACE } from '../theme';
 import { details, hasKey, img, Title } from '../lib/tmdb';
 import { getFavorites } from '../lib/store';
 
@@ -33,7 +33,7 @@ export default function MyList({ navigation, active }: any) {
     <View style={{ flex: 1 }}>
       <Text style={styles.heading}>My List</Text>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: NAV_SPACE, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.accent]} progressBackgroundColor={colors.surface2} />}
       >
@@ -57,7 +57,7 @@ export default function MyList({ navigation, active }: any) {
 }
 
 const styles = StyleSheet.create({
-  heading: { color: colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.5, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 16 },
+  heading: { color: colors.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.8, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 16 },
   empty: { alignItems: 'center', marginTop: 90, paddingHorizontal: 34 },
   emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 16 },
   emptyText: { color: colors.muted, marginTop: 6, textAlign: 'center', lineHeight: 20 },

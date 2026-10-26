@@ -4,6 +4,8 @@ export type Stream = {
   quality?: string;
   headers?: Record<string, string>;
   label?: string;
+  // Text the provider gave about this link (name, title, language). Used to prefer Hindi / Bangla.
+  info?: string;
 };
 
 export type Plugin = {

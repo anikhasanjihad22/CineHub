@@ -91,3 +91,22 @@ create policy "favorites own" on public.favorites     for all using (user_id = a
 
 -- 5) Make yourself admin: sign up in the app first, then run this with your email
 -- update public.profiles set role = 'admin' where email = 'YOUR_EMAIL_HERE';
+
+-- 6) App updates (forced / optional) ---------------------------------------
+-- One row. The app compares its own version with these numbers.
+--   min_version    : phones older than this are blocked until they update
+--   latest_version : phones older than this see an "Update available" card
+create table if not exists public.app_config (
+  id int primary key default 1 check (id = 1),
+  latest_version text not null default '1.0.0',
+  min_version text not null default '1.0.0',
+  apk_url text,
+  notes text,
+  updated_at timestamptz not null default now()
+);
+insert into public.app_config (id) values (1) on conflict (id) do nothing;
+alter table public.app_config enable row level security;
+drop policy if exists "config read" on public.app_config;
+drop policy if exists "config admin write" on public.app_config;
+create policy "config read" on public.app_config for select using (true);
+create policy "config admin write" on public.app_config for all using (public.is_admin()) with check (public.is_admin());

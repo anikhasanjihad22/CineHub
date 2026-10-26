@@ -6,7 +6,7 @@ import { Screen } from '../components/Screen';
 import { Button } from '../components/Button';
 import { Logo } from '../components/Logo';
 import { Icon } from '../components/Icon';
-import { colors, radius } from '../theme';
+import { colors, FILL, radius } from '../theme';
 import { hasKey, img, trending } from '../lib/tmdb';
 import { openSupport } from '../lib/support';
 
@@ -33,7 +33,7 @@ export default function Welcome({ navigation }: any) {
 
   return (
     <Screen edges={[]}>
-      <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
+      <View style={[FILL, { overflow: 'hidden' }]}>
         <View style={{ flexDirection: 'row', gap, paddingHorizontal: gap, marginTop: -colH * 0.25 }}>
           {cols.map((list, c) => (
             <View key={c} style={{ gap, marginTop: c === 1 ? colH * 0.45 : 0 }}>
@@ -46,7 +46,7 @@ export default function Welcome({ navigation }: any) {
         <LinearGradient
           colors={['rgba(10,10,12,0.55)', 'rgba(10,10,12,0.78)', colors.bg]}
           locations={[0, 0.45, 0.78]}
-          style={StyleSheet.absoluteFill}
+          style={FILL}
         />
       </View>
 
@@ -74,8 +74,8 @@ export default function Welcome({ navigation }: any) {
 
 const styles = StyleSheet.create({
   top: { paddingHorizontal: 22, paddingTop: 14 },
-  bottom: { paddingHorizontal: 22, paddingBottom: 16, justifyContent: 'flex-end' },
-  title: { color: colors.text, fontSize: 34, fontWeight: '900', letterSpacing: -0.8, lineHeight: 40 },
+  bottom: { paddingHorizontal: 22, paddingBottom: 16, justifyContent: 'flex-end', width: '100%', maxWidth: 560, alignSelf: 'center' },
+  title: { color: colors.text, fontSize: 36, fontWeight: '800', letterSpacing: -1, lineHeight: 42 },
   sub: { color: colors.textDim, fontSize: 15, marginTop: 10, lineHeight: 22 },
   help: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20 },
   helpText: { color: colors.muted, fontSize: 13, fontWeight: '600' },

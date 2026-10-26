@@ -7,10 +7,13 @@ import { Icon } from '../components/Icon';
 import { Button } from '../components/Button';
 import { Chips } from '../components/Chips';
 import { PosterRow, SectionTitle, Skeleton } from '../components/Poster';
-import { colors, radius } from '../theme';
+import { colors, FILL, radius } from '../theme';
 import { Cast, Detail, details, hasKey, img, matchTitle, seasonEpisodes, similar, Title } from '../lib/tmdb';
 import { isFavorite, toggleFavorite } from '../lib/store';
 import { openSupport } from '../lib/support';
+import { dlId, quickDownload, useDownloads } from '../lib/downloads';
+import { Focusable } from '../components/Focusable';
+import { isTV } from '../lib/platform';
 import type { CatalogItem } from '../plugins/types';
 
 type Ep = { number: number; name: string; overview: string; still: string | null; runtime: number };
@@ -32,6 +35,8 @@ export default function Details({ route, navigation }: any) {
   const [more, setMore] = useState<Title[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [toast, setToast] = useState('');
+  const dls = useDownloads();
 
   useEffect(() => {
     setError('');
@@ -60,8 +65,26 @@ export default function Details({ route, navigation }: any) {
     if (item) return navigation.navigate('Player', { kind: 'catalog', item, title: item.title });
     if (!d) return;
     navigation.navigate('Player', {
-      kind: 'tmdb', tmdbId: d.id, imdbId: d.imdbId, type: d.type, title: d.title, year: d.year, season: s, episode: e,
+      kind: 'tmdb', tmdbId: d.id, imdbId: d.imdbId, type: d.type, title: d.title, year: d.year, season: s, episode: e, poster: d.poster,
     });
+  }
+
+  const say = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200); };
+  const dlState = (s = 0, e = 0) => {
+    if (!d) return undefined;
+    return dls.find((x) => x.id === dlId(d.type, d.id, s, e));
+  };
+  async function download(s = 0, e = 0) {
+    if (!d) return;
+    const cur = dlState(s, e);
+    if (cur?.status === 'done') return say('Already downloaded');
+    if (cur?.status === 'downloading') return say('Already downloading');
+    say('Looking for a server...');
+    const r = await quickDownload({
+      tmdbId: d.id, type: d.type, season: s, episode: e, title: d.title,
+      subtitle: d.type === 'tv' ? `S${s}:E${e}` : d.year ?? '', posterUrl: d.poster ? img(d.poster, 'w342') : null,
+    });
+    say(r === 'none' ? 'No server available to download right now' : r === 'exists' ? 'Already in Downloads' : 'Download started');
   }
 
   if (error) {
@@ -107,19 +130,19 @@ export default function Details({ route, navigation }: any) {
   const isTv = item ? false : d!.type === 'tv';
   const genres = d?.genres ?? [];
   const cast: Cast[] = d?.cast ?? [];
-  const heroH = Math.min(Math.round(width * 1.15), 520);
+  const heroH = isTV ? Math.round(width * 0.4) : Math.min(Math.round(width * 1.15), 520);
 
   return (
     <Screen edges={['bottom']}>
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
         <View style={{ width, height: heroH, backgroundColor: colors.surface }}>
-          {cover && <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+          {cover && <Image source={{ uri: cover }} style={FILL} resizeMode="cover" />}
           <LinearGradient colors={['rgba(10,10,12,0.55)', 'rgba(10,10,12,0)']} style={styles.topFade} />
           <LinearGradient colors={colors.scrim} locations={[0, 0.6, 1]} style={styles.bottomFade} />
         </View>
         <Pressable onPress={() => navigation.goBack()} style={[styles.back, { top: insets.top + 10 }]} hitSlop={8}><Icon name="back" /></Pressable>
 
-        <View style={{ paddingHorizontal: 20, marginTop: -70 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: -70, maxWidth: isTV ? 760 : undefined }}>
           <Text style={styles.title}>{title}</Text>
 
           <View style={styles.metaRow}>
@@ -140,10 +163,19 @@ export default function Details({ route, navigation }: any) {
               onPress={() => (isTv ? play(season, 1) : play())}
             />
             {!item && d && (
-              <Button
-                label={fav ? 'In My List' : 'My List'} variant="secondary" icon={fav ? 'check' : 'plus'}
-                onPress={async () => setFav(await toggleFavorite(d.id, d.type))}
-              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Button
+                  label={fav ? 'In My List' : 'My List'} variant="secondary" icon={fav ? 'check' : 'plus'} style={{ flex: 1 }}
+                  onPress={async () => setFav(await toggleFavorite(d.id, d.type))}
+                />
+                {!isTv && (
+                  <Button
+                    label={dlState()?.status === 'done' ? 'Downloaded' : dlState()?.status === 'downloading' ? `${Math.max(0, Math.round((dlState()!.progress) * 100))}%` : 'Download'}
+                    variant="secondary" icon={dlState()?.status === 'done' ? 'check' : 'download'} style={{ flex: 1 }}
+                    onPress={() => download()}
+                  />
+                )}
+              </View>
             )}
           </View>
 
@@ -177,7 +209,7 @@ export default function Details({ route, navigation }: any) {
               {eps.map((e) => (
                 <Pressable key={e.number} onPress={() => play(season, e.number)} style={({ pressed }) => [styles.ep, pressed && { opacity: 0.75 }]}>
                   <View style={styles.epThumb}>
-                    {e.still && <Image source={{ uri: img(e.still, 'w300')! }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+                    {e.still && <Image source={{ uri: img(e.still, 'w300')! }} style={FILL} resizeMode="cover" />}
                     <View style={styles.epPlay}><Icon name="play" size={14} /></View>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -185,6 +217,9 @@ export default function Details({ route, navigation }: any) {
                     {!!e.runtime && <Text style={styles.epRun}>{e.runtime} min</Text>}
                     {!!e.overview && <Text style={styles.epSub} numberOfLines={2}>{e.overview}</Text>}
                   </View>
+                  <Focusable onPress={() => download(season, e.number)} hitSlop={8} ring={20} style={styles.epDl}>
+                    <Icon name={dlState(season, e.number)?.status === 'done' ? 'check' : 'download'} size={18} color={dlState(season, e.number)?.status === 'downloading' ? colors.accent : '#fff'} />
+                  </Focusable>
                 </Pressable>
               ))}
             </View>
@@ -223,11 +258,15 @@ export default function Details({ route, navigation }: any) {
           />
         )}
       </ScrollView>
+      {!!toast && <View style={styles.toast} pointerEvents="none"><Text style={styles.toastText}>{toast}</Text></View>}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  epDl: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center' },
+  toast: { position: 'absolute', left: 24, right: 24, bottom: 34, alignItems: 'center' },
+  toastText: { color: '#fff', fontWeight: '700', backgroundColor: 'rgba(40,40,46,0.96)', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, overflow: 'hidden' },
   errBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
   errTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 14 },
   errText: { color: colors.muted, textAlign: 'center', marginTop: 6, lineHeight: 20 },
@@ -235,7 +274,7 @@ const styles = StyleSheet.create({
   back: { position: 'absolute', top: 14, left: 14, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   topFade: { position: 'absolute', top: 0, left: 0, right: 0, height: 110 },
   bottomFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-  title: { color: colors.text, fontSize: 32, fontWeight: '900', letterSpacing: -0.7 },
+  title: { color: colors.text, fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' },
   meta: { color: colors.textDim, fontSize: 14, fontWeight: '600' },
   rate: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -245,7 +284,7 @@ const styles = StyleSheet.create({
   overview: { color: colors.textDim, fontSize: 15, lineHeight: 23 },
   more: { color: colors.text, fontSize: 13, fontWeight: '700', marginTop: 6 },
   genres: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
-  genre: { paddingHorizontal: 12, height: 28, borderRadius: radius.pill, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  genre: { paddingHorizontal: 14, height: 30, borderRadius: radius.pill, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
   genreText: { color: colors.textDim, fontSize: 12, fontWeight: '600' },
   ep: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   epThumb: { width: 130, height: 74, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
