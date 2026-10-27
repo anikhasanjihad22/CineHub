@@ -10,6 +10,7 @@ import { refreshPlugins } from '../../plugins/loader';
 import { clearCatalogCache } from '../../plugins/catalog';
 import { capabilities, getPluginError, inspectCode, testPlugin } from '../../plugins/sandbox';
 import type { Plugin } from '../../plugins/types';
+import { adapt, normalizeUrl } from '../../plugins/adapters';
 
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const PRESET_CATS = ['movies', 'tv', 'sports', 'news', 'anime', 'live'];
@@ -142,10 +143,10 @@ export default function AdminPlugins({ navigation }: any) {
 
   async function fetchCode() {
     setMsg('');
-    if (!url.trim()) return setMsg('Paste a code link or a Nuvio repo manifest.json link first.');
+    if (!url.trim()) return setMsg('Paste a plugin link, Nuvio repo, Stremio addon or M3U playlist link first.');
     setFetching(true);
     try {
-      const u = rawUrl(url);
+      const u = rawUrl(normalizeUrl(url));
       const r = await fetch(u);
       if (!r.ok) throw new Error(`Could not download (${r.status})`);
       const text = await r.text();
@@ -155,6 +156,16 @@ export default function AdminPlugins({ navigation }: any) {
         setMsg('Repo link found. Installing all providers, please wait...');
         await importManifest(j, u);
         setMsg('');
+        return;
+      }
+      // Stremio addon or M3U playlist: converted into a normal plugin, then shown for Test / Save.
+      const ad = adapt(text, u);
+      if (ad) {
+        setEditing(null); setName(ad.name); setCode(ad.code); setCats(ad.categories);
+        setCatOptions((cur) => Array.from(new Set([...cur, ...ad.categories])));
+        setPriority('100'); setTimeoutSec('30');
+        setMsg(ad.format === 'stremio' ? 'Stremio addon found and converted. Press Test, then Install.' : 'Playlist found and converted. Press Test, then Install.');
+        setAdding(true);
         return;
       }
       setCode(text);
@@ -221,7 +232,7 @@ export default function AdminPlugins({ navigation }: any) {
         {/* quick import */}
         <View style={styles.importCard}>
           <Text style={styles.importTitle}>Import providers</Text>
-          <Text style={styles.importSub}>Paste a Nuvio repo manifest.json link to install every provider at once, or a single plugin code link.</Text>
+          <Text style={styles.importSub}>Paste a link and press Fetch. Works with: Nuvio repo (all providers at once), Stremio addon (manifest.json or stremio://), M3U / IPTV playlist, or a single JavaScript plugin.</Text>
           <View style={styles.row}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="https://.../manifest.json" placeholderTextColor={colors.muted}
@@ -251,7 +262,7 @@ export default function AdminPlugins({ navigation }: any) {
           <View style={styles.empty}>
             <Icon name="plug" size={36} color={colors.muted} />
             <Text style={styles.emptyTitle}>No plugins yet</Text>
-            <Text style={styles.emptyText}>Paste a Nuvio repo manifest.json link above and press Fetch.</Text>
+            <Text style={styles.emptyText}>Paste a Nuvio repo, Stremio addon, M3U playlist or plugin link above and press Fetch.</Text>
           </View>
         )}
 

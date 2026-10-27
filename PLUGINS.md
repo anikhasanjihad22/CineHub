@@ -42,3 +42,16 @@ Also accepted: `module.exports = {...}`, `export const getStreams = ...`.
 ## Test button
 Shows: found functions, number of links / items, first titles, posters, and the exact error if it fails.
 A plugin that fails never breaks the app. Its last error is shown on its card in Manage plugins.
+
+## Other formats (v3)
+Profile > Manage plugins > paste a link > Fetch. CineHub converts these by itself:
+
+| link | what you get |
+|---|---|
+| Nuvio repo `manifest.json` | every provider installed at once |
+| Stremio addon (`manifest.json` or `stremio://...`) | streams for every movie / episode + the addon's own lists (Home rows, Search) |
+| M3U / M3U8 / IPTV playlist | live TV, sports, radio as a category (default `live`) |
+| single JavaScript file | normal plugin (`getStreams`, `getCatalog`, `getLinks`) |
+
+Not possible inside this app: CloudStream `.cs3` and Aniyomi extensions (native Kotlin code), and torrent-only
+results (a torrent hash has no direct video link; Stremio addons with a debrid service work because they return normal links).
